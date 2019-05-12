@@ -1,2 +1,1 @@
-# kaitlynhe.github.io
 # hourglass
