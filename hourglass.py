@@ -85,10 +85,11 @@ def dict(url):
 
 # --------------------- getting sunset and sunrise time with comparison to the current time in UTC format -------------------------#
 # setting up the API at University of Washington latitude and longtitude
-def sunsetriseREST(params={}):
+def sunsetriseREST():
+    params = {'lat': 47.655548, 'lng' : -122.303200}
     baseurl = 'https://api.sunrise-sunset.org/json?'
-    params['lat'] = 47.655548  # UW Latitude
-    params['lng'] = -122.303200  # UW Longitude
+    #params['lat'] = 47.655548  # UW Latitude
+    #params['lng'] = -122.303200  # UW Longitude
 
     url = baseurl + urlencode(params) #PYTHON 3 (might work with 2)
     return safeGet(url)
@@ -109,7 +110,6 @@ def sunset(dict):
     return sunsettime
 
 
-# print sunset(jsontime)
 
 # getting sunrise time from API in UTC format
 def sunriseFunction(dict):
@@ -129,7 +129,20 @@ def sunsetFunction(dict):
 #Use a "main" function to run all code. Use a "while True" loop within main to repeat code
 def main():
     # Run Once
-
+    thisdict = {
+        5: [65000, 45500],
+        8: [8000, 39500],
+        9: [65000, 55500]
+        12: [8000, 39500],
+        13: [8000, 39500],
+        17: [8000, 39500],
+        18: [8000, 39500],
+        19: [8000, 39500],
+        20: [8000, 39500],
+        24: [8000, 39500],
+        25: [8000, 39500],
+        26: [8000, 39500]
+    }
     #Get current time
     current_time = datetime.utcnow()
     # converting current time to 12-hour format for API use
@@ -137,6 +150,10 @@ def main():
     timeurl = sunsetriseREST()
     jsontime = dict(timeurl)
     print(pretty(jsontime))
+
+    # Iterating over keys
+    for lightNum in thisdict:
+        print(thisdict[lightNum][0])
 
     # Initialize loop
     while True:
@@ -154,6 +171,8 @@ main()
 
 def holidayREST():
     baseurl = ''
+
+
 
 # UPPER LOBBY LIGHTS
 # ---------sunset colors-----------------#
