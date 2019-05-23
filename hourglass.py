@@ -1,36 +1,89 @@
-# HOURGLASS:
-
 # importing utility libraries
 from urllib.parse import urlencode
 import urllib.request
 import urllib, json, os, logging, time, random
+
+# MQTT Client functions
 import paho.mqtt.client as mqtt
 
 # getting the current time from python datetime object
 from datetime import datetime
+from datetime import timedelta
 
-
-
-
+# IP Address of Philips Hue "Sieg Master" Bridge
 sieg_master_ip = "172.28.219.179"
 
+# API Token we have generated for Sieg Master Bridge
 sieg_master_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB"
 
-#changeLight: Modify up to 4 parameters of a single light
-#Parameter 1: lightNum - see mapping of Sieg lights: https://files.slack.com/files-tmb/TH0QLFCH3-FJGHX7K4P-6ecab43eeb/image_from_ios_720.jpg
-#Paramter 2: Transitiontime (1/10ths of a second)
-#Paramters 3 - 10: Names and values for Philiphs Hue Lighting paramters
-#Example usage: changeLight(21,2,"on","true","hue", "30000")
-#Turns light 21 to a greenish color
+# light_palette_dict: Contains the values for each light to set all the lights to defined palettes
+# To access: light_palette_dict[lightNum][n]
+# n = 0 : "sunset colors"
+# n = 1 : "warmer colors"
+# Set lights to palette n:
+# for lightNum in light_palette_dict:
+#     print(light_palette_dict[lightNum][0])
 
-def changeLight(lightNum, transitiontime, parameter1, newValue1, parameter2 = None, newValue2 = None, parameter3 = None,
-                newValue3 = None, parameter4 = None, newValue4 = None):
+# Easily add more palettes by adding more values to arrays
 
-    req_string = "http://" + str(sieg_master_ip) + "/api/" + str(sieg_master_token) + "/lights/" + str(lightNum) + "/state";
+light_palette_dict = {
+    5: [65000, 45500],
+    8: [8000, 39500],
+    9: [65000, 55500],
+    12: [8000, 39500],
+    13: [65000, 55500],
+    17: [63000, 64400],
+    18: [12345, 34000],
+    19: [65000, 45500],
+    20: [10000, 34900],
+    24: [65000, 45500],
+    25: [10000, 34900],
+    26: [8000, 39500]
+}
+
+
+# setup: Run once at the beginning
+def setup():
+    # MQTT Functions - once we figure out a broker
+    # broker_address = "192.168.1.184"
+    broker_address = "broker.mqttdashboard.com"  # use external broker
+    client = mqtt.Client("P1")  # create new instance
+    client.connect(broker_address)  # connect to broker
+    client.publish("hcdeiol/testing", "TEST")  # publish
+
+    # Get current time
+    current_time = datetime.utcnow()
+    # converting current time to 12-hour format for API use
+    current_time = current_time.strftime("%I:%M:%S")
+    timeurl = sunsetriseREST()
+    jsontime = dict(timeurl)
+    print(pretty(jsontime))
+    print(sunset(jsontime) + timedelta(days=1))
+
+
+# loop: Run continuously
+def loop():
+    time.sleep(10)
+    # getting current time in UTC format for sunset-sunrise API use
+    current_time = datetime.now()
+    print(current_time)
+
+
+# changeLight: Modify up to 4 parameters of a single light
+# Parameter 1: lightNum - see mapping of Sieg lights: https://files.slack.com/files-tmb/TH0QLFCH3-FJGHX7K4P-6ecab43eeb/image_from_ios_720.jpg
+# Paramter 2: Transitiontime (1/10ths of a second)
+# Paramters 3 - 10: Names and values for Philiphs Hue Lighting paramters
+# Example usage: changeLight(21,2,"on","true","hue", "30000")
+# Turns light 21 to a greenish color
+
+def changeLight(lightNum, transitiontime, parameter1, newValue1, parameter2=None, newValue2=None, parameter3=None,
+                newValue3=None, parameter4=None, newValue4=None):
+    req_string = "http://" + str(sieg_master_ip) + "/api/" + str(sieg_master_token) + "/lights/" + str(
+        lightNum) + "/state";
 
     put_string = "{\"" + str(parameter1) + "\":" + str(newValue1) + ", \"transitiontime\":" + str(transitiontime);
     if (parameter2 != None):
-        put_string +=  ", \"" + parameter2 + "\": " + newValue2;
+        put_string += ", \"" + parameter2 + "\": " + newValue2;
     if (parameter3 != None):
         put_string += ", \"" + parameter3 + "\" : " + newValue3;
     if (parameter4 != None):
@@ -39,20 +92,20 @@ def changeLight(lightNum, transitiontime, parameter1, newValue1, parameter2 = No
     requests.put(req_string, put_string, verify=True)
 
 
-#changeGroup: Modify up to 4 parameters of a group of lights
-#Parameter 1: groupNum - group 0 is all lights, group 1 is bottom floor, group 2 is top floor
-#Paramter 2: Transitiontime (1/10ths of a second)
-#Paramters 3 - 10: Names and values for Philiphs Hue Lighting paramters
-#Example usage: changeGroup(1,2,"on","true","hue", "10000", "bri", "254")
-#Turns bottom floor to a bright white
-def changeGroup(groupNum, transitiontime, parameter1, newValue1, parameter2 = None, newValue2 = None, parameter3 = None,
-                newValue3 = None, parameter4 = None, newValue4 = None):
-
-    req_string = "http://" + str(sieg_master_ip) + "/api/" + str(sieg_master_token) + "/groups/" + str(groupNum) + "/action";
+# changeGroup: Modify up to 4 parameters of a group of lights
+# Parameter 1: groupNum - group 0 is all lights, group 1 is bottom floor, group 2 is top floor
+# Paramter 2: Transitiontime (1/10ths of a second)
+# Paramters 3 - 10: Names and values for Philiphs Hue Lighting paramters
+# Example usage: changeGroup(1,2,"on","true","hue", "10000", "bri", "254")
+# Turns bottom floor to a bright white
+def changeGroup(groupNum, transitiontime, parameter1, newValue1, parameter2=None, newValue2=None, parameter3=None,
+                newValue3=None, parameter4=None, newValue4=None):
+    req_string = "http://" + str(sieg_master_ip) + "/api/" + str(sieg_master_token) + "/groups/" + str(
+        groupNum) + "/action";
 
     put_string = "{\"" + str(parameter1) + "\":" + str(newValue1) + ", \"transitiontime\":" + str(transitiontime);
     if (parameter2 != None):
-        put_string +=  ", \"" + parameter2 + "\": " + newValue2;
+        put_string += ", \"" + parameter2 + "\": " + newValue2;
     if (parameter3 != None):
         put_string += ", \"" + parameter3 + "\" : " + newValue3;
     if (parameter4 != None):
@@ -60,12 +113,13 @@ def changeGroup(groupNum, transitiontime, parameter1, newValue1, parameter2 = No
     put_string += "}";
     requests.put(req_string, put_string, verify=True)
 
-#Return a readable version of json data for print debugging
+
+# Return a readable version of json data for print debugging
 def pretty(obj):  # help to read the json format easier to read
     return json.dumps(obj, sort_keys=True, indent=2)
 
 
-#HReturn results of a urlopen request, handling errors
+# Return results of a urlopen request, handling errors
 def safeGet(url):
     try:
         return urllib.request.urlopen(url)
@@ -87,13 +141,14 @@ def dict(url):
 # --------------------- getting sunset and sunrise time with comparison to the current time in UTC format -------------------------#
 # setting up the API at University of Washington latitude and longtitude
 def sunsetriseREST():
-    params = {'lat': 47.655548, 'lng' : -122.303200}
+    params = {'lat': 47.655548, 'lng': -122.303200} #UW Lat/Long
     baseurl = 'https://api.sunrise-sunset.org/json?'
-    #params['lat'] = 47.655548  # UW Latitude
-    #params['lng'] = -122.303200  # UW Longitude
+    # params['lat'] = 47.655548  # UW Latitude
+    # params['lng'] = -122.303200  # UW Longitude
 
-    url = baseurl + urlencode(params) #PYTHON 3 (might work with 2)
+    url = baseurl + urlencode(params)
     return safeGet(url)
+
 
 # getting the sunrise time at Seattle/UW in UTC format
 def sunrise(dict):
@@ -111,7 +166,6 @@ def sunset(dict):
     return sunsettime
 
 
-
 # getting sunrise time from API in UTC format
 def sunriseFunction(dict):
     rise = sunrise(dict)
@@ -127,67 +181,16 @@ def sunsetFunction(dict):
         # some HUE light effects???
 
 
-#Use a "main" function to run all code. Use a "while True" loop within main to repeat code
+# Use a "main" function to run all code. Use a "while True" loop within main to repeat code
 def main():
     # Run Once
-
-    # MQTT Functions - once we figure out a broker
-    broker_address = "192.168.1.184"
-    # # broker_address="iot.eclipse.org" #use external broker
-    # client = mqtt.Client("P1")  # create new instance
-    # client.connect(broker_address)  # connect to broker
-    # client.publish("house/main-light", "OFF")  # publish
-
-    # Contains the values for each light to set all the lights to defined paletted
-    # To access: light_palette_dict[lightNum][n]
-    # n = 0 : "sunset colors"
-    # n = 1 : "warmer colors"
-    light_palette_dict = {
-        5: [65000, 45500],
-        8: [8000, 39500],
-        9: [65000, 55500],
-        12: [8000, 39500],
-        13: [65000, 55500],
-        17: [63000, 64400],
-        18: [12345, 34000],
-        19: [65000, 45500],
-        20: [10000, 34900],
-        24: [65000, 45500],
-        25: [10000, 34900],
-        26: [8000, 39500]
-    }
-
-
-    #Get current time
-    current_time = datetime.utcnow()
-    # converting current time to 12-hour format for API use
-    current_time = current_time.strftime("%I:%M:%S")
-    timeurl = sunsetriseREST()
-    jsontime = dict(timeurl)
-    print(pretty(jsontime))
-
-    # Iterating over keys
-    for lightNum in thisdict:
-        print(thisdict[lightNum][0])
-
+    setup()
     # Initialize loop
     while True:
-        print("S")
-        time.sleep(10)
-        # getting current time in UTC format for sunset-sunrise API use
-        #current_time = datetime.utcnow()
-        #print(current_time)
+        loop()
+
 
 main()
-
-
-# -------------------- working to get US holidays ---------------------------#
-# using holiday API from https://holidayapi.pl/
-
-def holidayREST():
-    baseurl = ''
-
-
 
 # UPPER LOBBY LIGHTS
 # ---------sunset colors-----------------#
