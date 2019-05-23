@@ -4,6 +4,7 @@
 from urllib.parse import urlencode
 import urllib.request
 import urllib, json, os, logging, time, random
+import paho.mqtt.client as mqtt
 
 # getting the current time from python datetime object
 from datetime import datetime
@@ -129,20 +130,34 @@ def sunsetFunction(dict):
 #Use a "main" function to run all code. Use a "while True" loop within main to repeat code
 def main():
     # Run Once
-    thisdict = {
+
+    # MQTT Functions - once we figure out a broker
+    broker_address = "192.168.1.184"
+    # # broker_address="iot.eclipse.org" #use external broker
+    # client = mqtt.Client("P1")  # create new instance
+    # client.connect(broker_address)  # connect to broker
+    # client.publish("house/main-light", "OFF")  # publish
+
+    # Contains the values for each light to set all the lights to defined paletted
+    # To access: light_palette_dict[lightNum][n]
+    # n = 0 : "sunset colors"
+    # n = 1 : "warmer colors"
+    light_palette_dict = {
         5: [65000, 45500],
         8: [8000, 39500],
-        9: [65000, 55500]
+        9: [65000, 55500],
         12: [8000, 39500],
-        13: [8000, 39500],
-        17: [8000, 39500],
-        18: [8000, 39500],
-        19: [8000, 39500],
-        20: [8000, 39500],
-        24: [8000, 39500],
-        25: [8000, 39500],
+        13: [65000, 55500],
+        17: [63000, 64400],
+        18: [12345, 34000],
+        19: [65000, 45500],
+        20: [10000, 34900],
+        24: [65000, 45500],
+        25: [10000, 34900],
         26: [8000, 39500]
     }
+
+
     #Get current time
     current_time = datetime.utcnow()
     # converting current time to 12-hour format for API use
