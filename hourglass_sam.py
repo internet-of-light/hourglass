@@ -1,4 +1,4 @@
-# HOURGLASS:
+
 
 # importing utility libraries
 from urllib.parse import urlencode
@@ -7,6 +7,10 @@ import urllib, json, os, logging, time, random
 
 # getting the current time from python datetime object
 from datetime import datetime
+
+# HOURGLASS
+# This file contains functions to fetch data from multiple APIs
+# and control the Philips Hue lighting system in Sieg Hall
 
 
 
@@ -17,7 +21,7 @@ sieg_master_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB"
 
 #changeLight: Modify up to 4 parameters of a single light
 #Parameter 1: lightNum - see mapping of Sieg lights: https://files.slack.com/files-tmb/TH0QLFCH3-FJGHX7K4P-6ecab43eeb/image_from_ios_720.jpg
-#Paramter 2: Transitiontime (1/10ths of a second)
+#Parameter 2: Transitiontime (1/10ths of a second)
 #Paramters 3 - 10: Names and values for Philiphs Hue Lighting paramters
 #Example usage: changeLight(21,2,"on","true","hue", "30000")
 #Turns light 21 to a greenish color
@@ -40,7 +44,7 @@ def changeLight(lightNum, transitiontime, parameter1, newValue1, parameter2 = No
 
 #changeGroup: Modify up to 4 parameters of a group of lights
 #Parameter 1: groupNum - group 0 is all lights, group 1 is bottom floor, group 2 is top floor
-#Paramter 2: Transitiontime (1/10ths of a second)
+#Parameter 2: Transitiontime (1/10ths of a second)
 #Paramters 3 - 10: Names and values for Philiphs Hue Lighting paramters
 #Example usage: changeGroup(1,2,"on","true","hue", "10000", "bri", "254")
 #Turns bottom floor to a bright white
