@@ -2,6 +2,8 @@
 from urllib.parse import urlencode
 import urllib.request
 import urllib, json, os, logging, time, random
+#Interact w Hue
+import requests
 
 # MQTT Client functions
 import paho.mqtt.client as mqtt
@@ -17,57 +19,119 @@ sieg_master_ip = "172.28.219.179"
 sieg_master_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB"
 
 # light_palette_dict: Contains the values for each light to set all the lights to defined palettes
+# Contains the palettes that were already included in the hourglass sketch
 # To access: light_palette_dict[lightNum][n]
 # n = 0 : "sunset colors"
 # n = 1 : "warmer colors"
 # Set lights to palette n:
 # for lightNum in light_palette_dict:
-#     print(light_palette_dict[lightNum][0])
+#     changeLight(lightNum, 2, "hue", light_palette_dict[lightNum][n*3],
+#       "bri", light_palette_dict[lightNum][n*3+1], "sat", light_palette_dict[lightNum][n*3+2]);
 
 # Easily add more palettes by adding more values to arrays
-
+# Only for upstairs lights rn
 light_palette_dict = {
-    5: [65000, 45500],
-    8: [8000, 39500],
-    9: [65000, 55500],
-    12: [8000, 39500],
-    13: [65000, 55500],
-    17: [63000, 64400],
-    18: [12345, 34000],
-    19: [65000, 45500],
-    20: [10000, 34900],
-    24: [65000, 45500],
-    25: [10000, 34900],
-    26: [8000, 39500]
+    #Lightnum: [pallette1Hue,palette1Bri,palette1Sat, [pallette2Hue,palette2Bri,palette2Sat]
+    5: [65000,200,100, 45500,200,100],
+    8: [8000,254,200, 39500,254,130],
+    9: [65000,254,150, 55500254,90],
+    12: [8000,254,200, 39500,254,130],
+    13: [65000,254,150, 55500254,90],
+    17: [63000,200,170, 64400,200,90],
+    18: [12345,254,80, 34000,254,100],
+    19: [65000,200,100, 45500,200,100],
+    20: [10000,254,160, 34900,254,80],
+    24: [65000,254,100, 45500,254,100],
+    25: [10000,254,160, 34900,254,80],
+    26: [8000,254,200, 9500,254,130]
 }
 
 
 # setup: Run once at the beginning
 def setup():
-    # MQTT Functions - once we figure out a broker
-    # broker_address = "192.168.1.184"
-    broker_address = "broker.mqttdashboard.com"  # use external broker
-    client = mqtt.Client("P1")  # create new instance
-    client.connect(broker_address)  # connect to broker
-    client.publish("hcdeiol/testing", "TEST")  # publish
 
+    # MQTT Client Setup
+    global client
+    client = mqtt.Client("csadgsdagsdagsdg")  # create new instance
+    client.on_connect = on_connect
+    broker_address = "broker.mqttdashboard.com"
+    client.connect(broker_address)  # connect to broker
+    client.loop_start()
+    client.on_message = on_message
+    client._keepalive = 60
+    #client.publish("hcdeiol/testing", "Hourglass Turned on")  # publish
+
+
+    #Time Functions Setup
     # Get current time
     current_time = datetime.utcnow()
     # converting current time to 12-hour format for API use
     current_time = current_time.strftime("%I:%M:%S")
     timeurl = sunsetriseREST()
-    jsontime = dict(timeurl)
+    jsontime = json.load(timeurl)
     print(pretty(jsontime))
-    print(sunset(jsontime) + timedelta(days=1))
+    print("Sunset: " + sunset(jsontime))
+
+    # Example to change to palette 1
+    # paletteNum = 1
+    # for lightNum in light_palette_dict:
+    #     changeLight(lightNum, 2, "hue", light_palette_dict[lightNum][paletteNum * 3],
+    #                 "bri", light_palette_dict[lightNum][(paletteNum*3)+1], "sat", light_palette_dict[lightNum][(paletteNum*3)+2])
 
 
 # loop: Run continuously
 def loop():
-    time.sleep(10)
+    #time.sleep(1)
     # getting current time in UTC format for sunset-sunrise API use
     current_time = datetime.now()
-    print(current_time)
+    #print(current_time)
 
+
+# MQTT: The callback for when the client receives a CONNACK response from the server.
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code "+str(rc))
+
+    # Subscribing in on_connect() means that if we lose the connection and
+    # reconnect then subscriptions will be renewed.
+    client.subscribe("iol")
+
+# MQTT: Message Received Callback
+# Checks if the message is JSON formatted data containing the key
+# "Lights" or "Groups". If so, parse the JSON and make changes to Philips Hue lighting
+def on_message(client, userdata, msg):
+    topic=msg.topic
+    m_decode=str(msg.payload.decode("utf-8","ignore"))
+    print("data Received: " +m_decode)
+    m_in=json.loads(m_decode)
+    #print(type(m_in))
+    print(pretty(m_in))
+    print(m_in.keys())
+    if 'Lights' in m_in.keys():
+        print("FOUND LIGHTS")
+        for indiv_light_dict in m_in['Lights']:
+            print(indiv_light_dict.keys())
+            for k in indiv_light_dict.keys():
+                print("Key: " + k)
+                print(indiv_light_dict[k][0].keys())
+                on = indiv_light_dict[k][0]["on"]
+                hue = indiv_light_dict[k][0]["hue"]
+                sat = indiv_light_dict[k][0]["sat"]
+                bri = indiv_light_dict[k][0]["bri"]
+                changeLight(k, 2, "on", '"' + on + '"', "hue", '"' + hue + '"', "sat", '"' + sat + '"', "bri", '"' + bri + '"')
+
+    if 'Groups' in m_in.keys():
+        print("FOUND GROUPS")
+        for group_light_dict in m_in['Groups']:
+            print(group_light_dict.keys())
+            for k in group_light_dict.keys():
+                print("Key: " + k)
+                print(group_light_dict[k][0].keys())
+                on = group_light_dict[k][0]["on"]
+                hue = group_light_dict[k][0]["hue"]
+                sat = group_light_dict[k][0]["sat"]
+                bri = group_light_dict[k][0]["bri"]
+                changeGroup(k, 2, "on", '"' + on + '"', "hue", '"' + hue + '"', "sat", '"' + sat + '"', "bri",
+                            '"' + bri + '"')
 
 # changeLight: Modify up to 4 parameters of a single light
 # Parameter 1: lightNum - see mapping of Sieg lights: https://files.slack.com/files-tmb/TH0QLFCH3-FJGHX7K4P-6ecab43eeb/image_from_ios_720.jpg
@@ -89,6 +153,8 @@ def changeLight(lightNum, transitiontime, parameter1, newValue1, parameter2=None
     if (parameter4 != None):
         put_string += ", \"" + parameter4 + "\" : " + newValue4;
     put_string += "}";
+
+    print(req_string + "  " + put_string)
     requests.put(req_string, put_string, verify=True)
 
 
@@ -111,6 +177,8 @@ def changeGroup(groupNum, transitiontime, parameter1, newValue1, parameter2=None
     if (parameter4 != None):
         put_string += ", \"" + parameter4 + "\" : " + newValue4;
     put_string += "}";
+
+    print(req_string + "  " + put_string)
     requests.put(req_string, put_string, verify=True)
 
 
@@ -132,10 +200,6 @@ def safeGet(url):
     return None
 
 
-# getting the json format API
-def dict(url):
-    jsondict = json.load(url)
-    return jsondict
 
 
 # --------------------- getting sunset and sunrise time with comparison to the current time in UTC format -------------------------#
@@ -152,7 +216,7 @@ def sunsetriseREST():
 
 # getting the sunrise time at Seattle/UW in UTC format
 def sunrise(dict):
-    sunrisetime = dict['results']['sunrise']
+    sunrisetime = json.load['results']['sunrise']
     # getting sunrise time without AM/PM char
     sunrisetime = sunrisetime[:8]
     return sunrisetime
@@ -162,7 +226,8 @@ def sunrise(dict):
 def sunset(dict):
     sunsettime = dict['results']['sunset']
     # getting sunset time without AM/PM char
-    sunsettime = sunsettime[:7]
+    sunsettime = sunsettime
+    #datetime_object = datetime.strptime
     return sunsettime
 
 
@@ -182,7 +247,7 @@ def sunsetFunction(dict):
 
 
 # Use a "main" function to run all code. Use a "while True" loop within main to repeat code
-def main():
+if __name__ == "__main__":
     # Run Once
     setup()
     # Initialize loop
@@ -190,7 +255,6 @@ def main():
         loop()
 
 
-main()
 
 # UPPER LOBBY LIGHTS
 # ---------sunset colors-----------------#
