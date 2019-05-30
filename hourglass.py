@@ -14,9 +14,11 @@ from datetime import timedelta
 
 # IP Address of Philips Hue "Sieg Master" Bridge
 sieg_master_ip = "172.28.219.179"
+#sieg_master_ip = "10.0.1.16"
 
 # API Token we have generated for Sieg Master Bridge
 sieg_master_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB"
+#sieg_master_token = "efzstVYGsi1LQDdNF2N4GoR4pSBjCPOpGOX-qK1e"
 
 # light_palette_dict: Contains the values for each light to set all the lights to defined palettes
 # Contains the palettes that were already included in the hourglass sketch
@@ -54,7 +56,7 @@ def setup():
     global client
     client = mqtt.Client("csadgsdagsdagsdg")  # create new instance
     client.on_connect = on_connect
-    #broker_address = "broker.mqttdashboard.com"
+    #                      broker_address = "broker.mqttdashboard.com"
     broker_address = "test.mosquitto.org"
     client.connect(broker_address)  # connect to broker
     client.loop_start()
@@ -82,7 +84,8 @@ def setup():
 
 # loop: Run continuously
 def loop():
-    #time.sleep(1)
+    #changeLight(3, 2, "hue", "10000")
+    #time.sleep(10)
     # getting current time in UTC format for sunset-sunrise API use
     current_time = datetime.now()
     #print(current_time)
@@ -118,7 +121,9 @@ def on_message(client, userdata, msg):
                 hue = indiv_light_dict[k][0]["hue"]
                 sat = indiv_light_dict[k][0]["sat"]
                 bri = indiv_light_dict[k][0]["bri"]
-                changeLight(k, 2, "on", '"' + on + '"', "hue", '"' + hue + '"', "sat", '"' + sat + '"', "bri", '"' + bri + '"')
+                #changeLight(k, 2, "on", '"' + on + '"', "hue", '"' + hue + '"', "sat", '"' + sat + '"', "bri", '"' + bri + '"')
+                changeLight(k, 2, "on", on , "hue", hue , "sat", sat, "bri", bri)
+
 
     if 'Groups' in m_in.keys():
         print("FOUND GROUPS")
@@ -128,11 +133,18 @@ def on_message(client, userdata, msg):
                 print("Key: " + k)
                 print(group_light_dict[k][0].keys())
                 on = group_light_dict[k][0]["on"]
-                hue = group_light_dict[k][0]["hue"]
-                sat = group_light_dict[k][0]["sat"]
-                bri = group_light_dict[k][0]["bri"]
-                changeGroup(k, 2, "on", '"' + on + '"', "hue", '"' + hue + '"', "sat", '"' + sat + '"', "bri",
-                            '"' + bri + '"')
+                print(on)
+                if(on=="true"):
+                    print("pushing full group change")
+                    hue = group_light_dict[k][0]["hue"]
+                    sat = group_light_dict[k][0]["sat"]
+                    bri = group_light_dict[k][0]["bri"]
+                    changeGroup(k, 2, "on", on, "hue", hue, "sat", sat, "bri", bri)
+                    print("pushed")
+                else:
+                    changeGroup(k, 2, "on", on)
+                #changeGroup(k, 2, "on", '"' + on + '"', "hue", '"' + hue + '"', "sat", '"' + sat + '"', "bri", '"' + bri + '"')
+                #changeGroup(k, 2, "on", on, "hue", hue, "sat", sat, "bri", bri)
 
 # changeLight: Modify up to 4 parameters of a single light
 # Parameter 1: lightNum - see mapping of Sieg lights: https://files.slack.com/files-tmb/TH0QLFCH3-FJGHX7K4P-6ecab43eeb/image_from_ios_720.jpg
@@ -145,7 +157,7 @@ def changeLight(lightNum, transitiontime, parameter1, newValue1, parameter2=None
                 newValue3=None, parameter4=None, newValue4=None):
     req_string = "http://" + str(sieg_master_ip) + "/api/" + str(sieg_master_token) + "/lights/" + str(
         lightNum) + "/state";
-
+    print("change light")
     put_string = "{\"" + str(parameter1) + "\":" + str(newValue1) + ", \"transitiontime\":" + str(transitiontime);
     if (parameter2 != None):
         put_string += ", \"" + parameter2 + "\": " + newValue2;
@@ -156,7 +168,8 @@ def changeLight(lightNum, transitiontime, parameter1, newValue1, parameter2=None
     put_string += "}";
 
     print(req_string + "  " + put_string)
-    requests.put(req_string, put_string, verify=True)
+    r = requests.put(req_string, put_string, verify=True)
+    print(r)
 
 
 # changeGroup: Modify up to 4 parameters of a group of lights
@@ -169,7 +182,6 @@ def changeGroup(groupNum, transitiontime, parameter1, newValue1, parameter2=None
                 newValue3=None, parameter4=None, newValue4=None):
     req_string = "http://" + str(sieg_master_ip) + "/api/" + str(sieg_master_token) + "/groups/" + str(
         groupNum) + "/action";
-
     put_string = "{\"" + str(parameter1) + "\":" + str(newValue1) + ", \"transitiontime\":" + str(transitiontime);
     if (parameter2 != None):
         put_string += ", \"" + parameter2 + "\": " + newValue2;
@@ -178,10 +190,9 @@ def changeGroup(groupNum, transitiontime, parameter1, newValue1, parameter2=None
     if (parameter4 != None):
         put_string += ", \"" + parameter4 + "\" : " + newValue4;
     put_string += "}";
-
     print(req_string + "  " + put_string)
-    requests.put(req_string, put_string, verify=True)
-
+    r = requests.put(req_string, put_string, verify=True)
+    print(r)
 
 # Return a readable version of json data for print debugging
 def pretty(obj):  # help to read the json format easier to read
