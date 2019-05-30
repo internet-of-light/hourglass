@@ -54,7 +54,8 @@ def setup():
     global client
     client = mqtt.Client("csadgsdagsdagsdg")  # create new instance
     client.on_connect = on_connect
-    broker_address = "broker.mqttdashboard.com"
+    #broker_address = "broker.mqttdashboard.com"
+    broker_address = "test.mosquitto.org"
     client.connect(broker_address)  # connect to broker
     client.loop_start()
     client.on_message = on_message
