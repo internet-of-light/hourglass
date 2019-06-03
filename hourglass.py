@@ -87,7 +87,10 @@ lower_floor_string_map = {
 # setup: Run once at the beginning
 def setup():
 
+    print("Starting Setup!")
+
     #reading google sheets
+    print("\tSetting up sheets...")
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_name('My Project-67dbdb16f10c.json', scope)
     sheets_client = gspread.authorize(creds)
@@ -96,7 +99,8 @@ def setup():
     palettes_from_sheet = sheet.get_all_records()
     for palette in palettes_from_sheet:
         print(palette['PaletteName'])
-
+    print("\tSheets connected.")
+    print("\n\tStarting MQTT...")
     # MQTT Client Setup
     global mqtt_client
     mqtt_client = mqtt.Client(client_id="389ghcoeiuwhfjmd1943", clean_session=False)  # create new instance
@@ -110,17 +114,25 @@ def setup():
     #mqtt_client._keepalive = 60
     #mqtt_client.publish("hcdeiol/testing", "Hourglass Turned on")  # publish
 
+    print("\tMQTT Connected.")
+
 
     #Time Functions Setup
+    print("\tSetting time...")
     # Get current time
     current_time = datetime.utcnow()
     # converting current time to 12-hour format for API use
     current_time = current_time.strftime("%I:%M:%S")
     timeurl = sunsetriseREST()
     jsontime = json.load(timeurl)
+
+    print("\tTime set.")
+
     print(pretty(jsontime))
     print("Sunset: " + sunset(jsontime))
 
+
+    print("\n\nSetup Complete!")
     # Example to change to palette 1
     # paletteNum = 1
     # for lightNum in light_palette_dict:
@@ -142,7 +154,7 @@ def loop():
 
 # MQTT: The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
-    print("Connected with result code "+str(rc))
+    print("Connected to MQTT server with result code "+str(rc))
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
@@ -262,7 +274,9 @@ def changeGroup(groupNum, transitiontime, parameter1, newValue1, parameter2=None
 
 def fetchPaletteToLightsFromSheet(palette_name):
     print("Searching for palette: " + palette_name)
+
     palettes_from_sheet = sheet.get_all_records()
+
     for palette in palettes_from_sheet:
         if palette['PaletteName'] == palette_name:
             print("Found palette: " + palette_name)
