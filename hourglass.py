@@ -12,13 +12,19 @@ import paho.mqtt.client as mqtt
 from datetime import datetime
 from datetime import timedelta
 
+#reading from google sheets
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+home_debug=False
+
 # IP Address of Philips Hue "Sieg Master" Bridge
 sieg_master_ip = "172.28.219.179"
-#sieg_master_ip = "10.0.1.16"
+#sieg_master_ip = "10.0.1.16" #sam house
 
 # API Token we have generated for Sieg Master Bridge
 sieg_master_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB"
-#sieg_master_token = "efzstVYGsi1LQDdNF2N4GoR4pSBjCPOpGOX-qK1e"
+#sieg_master_token = "efzstVYGsi1LQDdNF2N4GoR4pSBjCPOpGOX-qK1e" #Sam house
 
 # light_palette_dict: Contains the values for each light to set all the lights to defined palettes
 # Contains the palettes that were already included in the hourglass sketch
@@ -48,21 +54,61 @@ light_palette_dict = {
     26: [8000,254,200, 9500,254,130]
 }
 
+#Upper floor dictionary int to string
+upper_floor_string_map = {
+    5: "5",
+    8: "8",
+    9: "9",
+    12: "12",
+    13: "13",
+    17: "17",
+    18: "18",
+    19: "19",
+    20: "20",
+    24: "24",
+    25: "25",
+    26: "26",
+}
+
+#Lower floor dictionary int to string
+lower_floor_string_map = {
+    22: "22",
+    15: "15",
+    10: "10",
+    21: "21",
+    7: "7",
+    23: "23",
+    16: "16",
+    14: "14",
+    11: "11",
+}
+
 
 # setup: Run once at the beginning
 def setup():
 
+    #reading google sheets
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name('My Project-67dbdb16f10c.json', scope)
+    sheets_client = gspread.authorize(creds)
+    global sheet
+    sheet = sheets_client.open('IOL Palettes').sheet1
+    palettes_from_sheet = sheet.get_all_records()
+    for palette in palettes_from_sheet:
+        print(palette['PaletteName'])
+
     # MQTT Client Setup
-    global client
-    client = mqtt.Client("csadgsdagsdagsdg")  # create new instance
-    client.on_connect = on_connect
+    global mqtt_client
+    mqtt_client = mqtt.Client(client_id="389ghcoeiuwhfjmd1943", clean_session=False)  # create new instance
+    mqtt_client.on_connect = on_connect
+    mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
     #                      broker_address = "broker.mqttdashboard.com"
     broker_address = "test.mosquitto.org"
-    client.connect(broker_address)  # connect to broker
-    client.loop_start()
-    client.on_message = on_message
-    client._keepalive = 60
-    #client.publish("hcdeiol/testing", "Hourglass Turned on")  # publish
+    mqtt_client.connect(broker_address)  # connect to broker
+    mqtt_client.loop_start()
+    mqtt_client.on_message = on_message
+    #mqtt_client._keepalive = 60
+    #mqtt_client.publish("hcdeiol/testing", "Hourglass Turned on")  # publish
 
 
     #Time Functions Setup
@@ -85,7 +131,10 @@ def setup():
 # loop: Run continuously
 def loop():
     #changeLight(3, 2, "hue", "10000")
-    #time.sleep(10)
+    #time.sleep(2)
+    #palettes_from_sheet = sheet.get_all_records()
+    #for palette in palettes_from_sheet:
+    #    print(palette['PaletteName'])
     # getting current time in UTC format for sunset-sunrise API use
     current_time = datetime.now()
     #print(current_time)
@@ -110,6 +159,11 @@ def on_message(client, userdata, msg):
     #print(type(m_in))
     print(pretty(m_in))
     print(m_in.keys())
+    if 'Palette' in m_in.keys() :
+        print("FOUND PALETTE")
+        palette_name = m_in['Palette']
+        print("Palette switch: name = " + palette_name)
+        fetchPaletteToLightsFromSheet(palette_name)
     if 'Lights' in m_in.keys():
         print("FOUND LIGHTS")
         for indiv_light_dict in m_in['Lights']:
@@ -121,7 +175,6 @@ def on_message(client, userdata, msg):
                 hue = indiv_light_dict[k][0]["hue"]
                 sat = indiv_light_dict[k][0]["sat"]
                 bri = indiv_light_dict[k][0]["bri"]
-                #changeLight(k, 2, "on", '"' + on + '"', "hue", '"' + hue + '"', "sat", '"' + sat + '"', "bri", '"' + bri + '"')
                 changeLight(k, 2, "on", on , "hue", hue , "sat", sat, "bri", bri)
 
 
@@ -143,8 +196,6 @@ def on_message(client, userdata, msg):
                     print("pushed")
                 else:
                     changeGroup(k, 2, "on", on)
-                #changeGroup(k, 2, "on", '"' + on + '"', "hue", '"' + hue + '"', "sat", '"' + sat + '"', "bri", '"' + bri + '"')
-                #changeGroup(k, 2, "on", on, "hue", hue, "sat", sat, "bri", bri)
 
 # changeLight: Modify up to 4 parameters of a single light
 # Parameter 1: lightNum - see mapping of Sieg lights: https://files.slack.com/files-tmb/TH0QLFCH3-FJGHX7K4P-6ecab43eeb/image_from_ios_720.jpg
@@ -157,19 +208,30 @@ def changeLight(lightNum, transitiontime, parameter1, newValue1, parameter2=None
                 newValue3=None, parameter4=None, newValue4=None):
     req_string = "http://" + str(sieg_master_ip) + "/api/" + str(sieg_master_token) + "/lights/" + str(
         lightNum) + "/state";
-    print("change light")
     put_string = "{\"" + str(parameter1) + "\":" + str(newValue1) + ", \"transitiontime\":" + str(transitiontime);
-    if (parameter2 != None):
-        put_string += ", \"" + parameter2 + "\": " + newValue2;
-    if (parameter3 != None):
-        put_string += ", \"" + parameter3 + "\" : " + newValue3;
-    if (parameter4 != None):
-        put_string += ", \"" + parameter4 + "\" : " + newValue4;
+    if parameter2 != None:
+        put_string += ", \"" + parameter2 + "\": " + newValue2
+    if parameter3 != None:
+        put_string += ", \"" + parameter3 + "\" : " + newValue3
+    if parameter4 != None   :
+        put_string += ", \"" + parameter4 + "\" : " + newValue4
     put_string += "}";
 
-    print(req_string + "  " + put_string)
-    r = requests.put(req_string, put_string, verify=True)
-    print(r)
+    print("ChangeLight: " + req_string + "  " + put_string)
+
+    try:
+        print("In")
+        if not home_debug:
+            requests.put(req_string, put_string, verify=False, timeout=1)ls
+        print("Out")
+    except requests.ConnectionError as e:
+        print("Connection error: " + e)
+    except requests.HTTPError as e:
+        print("HTTP error: " + e)
+    except requests.Timeout as e:
+        print("Timeout error: " + e)
+    print("done")
+
 
 
 # changeGroup: Modify up to 4 parameters of a group of lights
@@ -190,9 +252,32 @@ def changeGroup(groupNum, transitiontime, parameter1, newValue1, parameter2=None
     if (parameter4 != None):
         put_string += ", \"" + parameter4 + "\" : " + newValue4;
     put_string += "}";
-    print(req_string + "  " + put_string)
-    r = requests.put(req_string, put_string, verify=True)
-    print(r)
+
+    print("ChangeGroup: " + req_string + "  " + put_string)
+
+    if not home_debug:
+        r = requests.put(req_string, put_string, verify=True)
+        print(r)
+
+
+def fetchPaletteToLightsFromSheet(palette_name):
+    print("Searching for palette: " + palette_name)
+    palettes_from_sheet = sheet.get_all_records()
+    for palette in palettes_from_sheet:
+        if palette['PaletteName'] == palette_name:
+            print("Found palette: " + palette_name)
+            print("Palette Area/zone: " + palette['Area'])
+            palette_area = palette['Area']
+            if(palette_area == "Lower"):
+                for key in lower_floor_string_map:
+                    #print(key)
+                    #print(lower_floor_string_map[key])
+                    changeLight(key, 2, "on", "true", "hue", str(palette['Light ' + lower_floor_string_map[key] +' H']), "sat",
+                                str(palette['Light ' + lower_floor_string_map[key] +' S']),
+                                "bri", str(palette['Light ' + lower_floor_string_map[key] +' B']))
+                print("Pushed palette - " + palette_name + " - to Philips Hue lights")
+
+
 
 # Return a readable version of json data for print debugging
 def pretty(obj):  # help to read the json format easier to read
