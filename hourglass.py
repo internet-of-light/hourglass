@@ -222,7 +222,7 @@ def changeLight(lightNum, transitiontime, parameter1, newValue1, parameter2=None
     try:
         print("In")
         if not home_debug:
-            requests.put(req_string, put_string, verify=False, timeout=1)ls
+            requests.put(req_string, put_string, verify=False, timeout=1)
         print("Out")
     except requests.ConnectionError as e:
         print("Connection error: " + e)
