@@ -92,13 +92,14 @@ def setup():
     #reading google sheets
     print("\tSetting up sheets...")
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name('My Project-67dbdb16f10c.json', scope)
-    sheets_client = gspread.authorize(creds)
-    global sheet
-    sheet = sheets_client.open('IOL Palettes').sheet1
-    palettes_from_sheet = sheet.get_all_records()
-    for palette in palettes_from_sheet:
-        print(palette['PaletteName'])
+    #creds = ServiceAccountCredentials.from_json_keyfile_name('My Project-67dbdb16f10c.json', scope)
+    #creds = ServiceAccountCredentials.from_json_keyfile_name('internet-of-light-b5fe2f45bb5b.json')
+    #sheets_client = gspread.authorize(creds)
+    #global sheet
+    #sheet = sheets_client.open('IOL Palettes').sheet1
+   # #palettes_from_sheet = sheet.get_all_records()
+    #for palette in palettes_from_sheet:
+   #     print(palette['PaletteName'])
     print("\tSheets connected.")
     print("\n\tStarting MQTT...")
     # MQTT Client Setup
@@ -108,7 +109,7 @@ def setup():
     mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
     #                      broker_address = "broker.mqttdashboard.com"
     broker_address = "test.mosquitto.org"
-    mqtt_client.connect(broker_address)  # connect to broker
+    print(mqtt_client.connect(broker_address))  # connect to broker
     mqtt_client.loop_start()
     mqtt_client.on_message = on_message
     #mqtt_client._keepalive = 60
@@ -158,7 +159,7 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    client.subscribe("iol")
+    client.subscribe("hcdeiol")
 
 # MQTT: Message Received Callback
 # Checks if the message is JSON formatted data containing the key
