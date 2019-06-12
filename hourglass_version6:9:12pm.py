@@ -18,8 +18,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 home_debug=False
 
-TICTACTOE_RUNNING = False
-
 # IP Address of Philips Hue "Sieg Master" Bridge
 sieg_master_ip = "172.28.219.179"
 #sieg_master_ip = "10.0.1.16" #sam house
@@ -28,6 +26,33 @@ sieg_master_ip = "172.28.219.179"
 sieg_master_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB"
 #sieg_master_token = "efzstVYGsi1LQDdNF2N4GoR4pSBjCPOpGOX-qK1e" #Sam house
 
+# light_palette_dict: Contains the values for each light to set all the lights to defined palettes
+# Contains the palettes that were already included in the hourglass sketch
+# To access: light_palette_dict[lightNum][n]
+# n = 0 : "sunset colors"
+# n = 1 : "warmer colors"
+# Set lights to palette n:
+# for lightNum in light_palette_dict:
+#     changeLight(lightNum, 2, "hue", light_palette_dict[lightNum][n*3],
+#       "bri", light_palette_dict[lightNum][n*3+1], "sat", light_palette_dict[lightNum][n*3+2]);
+
+# Easily add more palettes by adding more values to arrays
+# Only for upstairs lights rn
+light_palette_dict = {
+    #Lightnum: [pallette1Hue,palette1Bri,palette1Sat, [pallette2Hue,palette2Bri,palette2Sat]
+    5: [65000,200,100, 45500,200,100],
+    8: [8000,254,200, 39500,254,130],
+    9: [65000,254,150, 55500254,90],
+    12: [8000,254,200, 39500,254,130],
+    13: [65000,254,150, 55500254,90],
+    17: [63000,200,170, 64400,200,90],
+    18: [12345,254,80, 34000,254,100],
+    19: [65000,200,100, 45500,200,100],
+    20: [10000,254,160, 34900,254,80],
+    24: [65000,254,100, 45500,254,100],
+    25: [10000,254,160, 34900,254,80],
+    26: [8000,254,200, 9500,254,130]
+}
 
 #Upper floor dictionary int to string
 upper_floor_string_map = {
@@ -65,18 +90,17 @@ def setup():
     print("Starting Setup!")
 
     #reading google sheets
-    print("\tSetting up sheets...")
+    #print("\tSetting up sheets...")
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name('My Project-67dbdb16f10c.json', scope)
-    #creds = ServiceAccountCredentials.from_json_keyfile_name('internet-of-light-b5fe2f45bb5b.json', scope)
-    #creds = ServiceAccountCredentials.from_json_keyfile_name('~/..s/../Downloads/My Project-67dbdb16f10c.json', scope)
-    sheets_client = gspread.authorize(creds)
-    global sheet
-    sheet = sheets_client.open('IOL Palettes').sheet1
-    palettes_from_sheet = sheet.get_all_records()
-    for palette in palettes_from_sheet:
-        print(palette['PaletteName'])
-    print("\tSheets connected.")
+    #creds = ServiceAccountCredentials.from_json_keyfile_name('My Project-67dbdb16f10c.json', scope)
+    #creds = ServiceAccountCredentials.from_json_keyfile_name('internet-of-light-b5fe2f45bb5b.json')
+    #sheets_client = gspread.authorize(creds)
+    #global sheet
+    #sheet = sheets_client.open('IOL Palettes').sheet1
+   # #palettes_from_sheet = sheet.get_all_records()
+    #for palette in palettes_from_sheet:
+   #     print(palette['PaletteName'])
+    #print("\tSheets connected.")
     print("\n\tStarting MQTT...")
     # MQTT Client Setup
     global mqtt_client
@@ -93,21 +117,20 @@ def setup():
 
     print("\tMQTT Connected.")
 
-    #fetchPaletteToLightsFromSheet("MirroringHappyGradient")
 
     #Time Functions Setup
-    #print("\tSetting time...")
+    print("\tSetting time...")
     # Get current time
-    #current_time = datetime.utcnow()
+    current_time = datetime.utcnow()
     # converting current time to 12-hour format for API use
-    #current_time = current_time.strftime("%I:%M:%S")
-    #timeurl = sunsetriseREST()
-    #jsontime = json.load(timeurl)
+    current_time = current_time.strftime("%I:%M:%S")
+    timeurl = sunsetriseREST()
+    jsontime = json.load(timeurl)
 
-    #print("\tTime set.")
+    print("\tTime set.")
 
-    #print(pretty(jsontime))
-    #print("Sunset: " + sunset(jsontime))
+    print(pretty(jsontime))
+    print("Sunset: " + sunset(jsontime))
 
 
     print("\n\nSetup Complete!")
@@ -145,35 +168,11 @@ def on_message(client, userdata, msg):
     #print(type(m_in))
     print(pretty(m_in))
     print(m_in.keys())
-    #Update hourglass's information on the status of the tic tac toe game
-    if 'tictactoe' in m_in.keys():
-        print("FOUND tictactoe")
-        tttStatus = m_in['tictactoe']
-        print("tttStat: " + tttStatus)
-        global TICTACTOE_RUNNING
-        if tttStatus == "on":
-            print("Set tttSat on")
-            TICTACTOE_RUNNING = True
-        elif tttStatus == "off":
-            TICTACTOE_RUNNING = False
-            print("Set tttSat off")
-        print("TICTACTOE_RUNNING: ")
-        print(TICTACTOE_RUNNING)
-    #Send a palette to the lights
-    if 'Palette' in m_in.keys():
+    if 'Palette' in m_in.keys() :
         print("FOUND PALETTE")
         palette_name = m_in['Palette']
         print("Palette switch: name = " + palette_name)
         fetchPaletteToLightsFromSheet(palette_name)
-
-        # Send a palette to the lights
-    if 'palette' in m_in.keys():
-        print("FOUND palette")
-        palette_name = m_in['palette']
-        print("Palette switch: name = " + palette_name)
-        fetchPaletteToLightsFromSheet(palette_name)
-
-    #Change an individual light
     if 'Lights' in m_in.keys():
         print("FOUND LIGHTS")
         for indiv_light_dict in m_in['Lights']:
@@ -187,7 +186,7 @@ def on_message(client, userdata, msg):
                 bri = indiv_light_dict[k][0]["bri"]
                 changeLight(k, 2, "on", on , "hue", hue , "sat", sat, "bri", bri)
 
-    #Change a group of lights
+
     if 'Groups' in m_in.keys():
         print("FOUND GROUPS")
         for group_light_dict in m_in['Groups']:
@@ -280,29 +279,14 @@ def fetchPaletteToLightsFromSheet(palette_name):
             print("Found palette: " + palette_name)
             print("Palette Area/zone: " + palette['Area'])
             palette_area = palette['Area']
-            print("Palette Area/zone: " + palette_area)
-            global TICTACTOE_RUNNING
-            if TICTACTOE_RUNNING:
-                print("Not sending palette to lower floor b/c TTT is running")
-            print("check")
-            if((palette_area == "lower" or palette_area == "all") and not TICTACTOE_RUNNING):
-                print("Sending to lower")
+            if(palette_area == "Lower"):
                 for key in lower_floor_string_map:
-                    print(key)
+                    #print(key)
                     #print(lower_floor_string_map[key])
                     changeLight(key, 2, "on", "true", "hue", str(palette['Light ' + lower_floor_string_map[key] +' H']), "sat",
                                 str(palette['Light ' + lower_floor_string_map[key] +' S']),
                                 "bri", str(palette['Light ' + lower_floor_string_map[key] +' B']))
-                print("Pushed palette - " + palette_name + " - to Philips Hue lights Lower Floor")
-            if (palette_area == "upper" or palette_area == "all"):
-                for key in upper_floor_string_map:
-                    # print(key)
-                    # print(upper_floor_string_map[key])
-                    changeLight(key, 2, "on", "true", "hue",
-                                str(palette['Light ' + upper_floor_string_map[key] + ' H']), "sat",
-                                str(palette['Light ' + upper_floor_string_map[key] + ' S']),
-                                "bri", str(palette['Light ' + upper_floor_string_map[key] + ' B']))
-                print("Pushed palette - " + palette_name + " - to Philips Hue lights Upper Floor")
+                print("Pushed palette - " + palette_name + " - to Philips Hue lights")
 
 
 
